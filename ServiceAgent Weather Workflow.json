@@ -1,0 +1,285 @@
+{
+  "name": "ServiceAgent Weather Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -288,
+        -192
+      ],
+      "id": "8d5e7116-1abb-4132-8875-3fbace341fc2",
+      "name": "Schedule Trigger",
+      "alwaysOutputData": false,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "794119d1-79c7-4b03-a30c-2046af932467",
+              "name": "City",
+              "value": "Madison",
+              "type": "string"
+            },
+            {
+              "id": "0a4affda-5d9d-4fea-b167-f73ff7a352ac",
+              "name": "countryCode",
+              "value": "US",
+              "type": "string"
+            },
+            {
+              "id": "4c78fa18-c23a-46ff-85ee-d95f898da304",
+              "name": "units",
+              "value": "metric",
+              "type": "string"
+            },
+            {
+              "id": "e8c47bc4-f3ca-448f-aaf1-bfc0d528700d",
+              "name": "temperatureUnits",
+              "value": "C",
+              "type": "string"
+            },
+            {
+              "id": "e7099fb6-a773-4ddb-b08c-ffaa427b2fc1",
+              "name": "recipientEmail",
+              "value": "your_email@example.com",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -64,
+        -192
+      ],
+      "id": "45d7b32f-2104-441d-bdb8-7f4d816fd7b4",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "url": "https://api.openweathermap.org/geo/1.0/direct",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.City }}"
+            },
+            {
+              "name": "appid",
+              "value": "={{ $vars.OPENWEATHER_API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        96,
+        -80
+      ],
+      "id": "b45e7e19-1881-4cdf-8a71-8038950dacee",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "url": "https://api.openweathermap.org/data/3.0/onecall",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "lat",
+              "value": "={{$json.lat}}"
+            },
+            {
+              "name": "lon",
+              "value": "={{$json.lon}}"
+            },
+            {
+              "name": "units",
+              "value": "{{$json.units}}"
+            },
+            {
+              "name": "appid",
+              "value": "={{ $vars.OPENWEATHER_API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        288,
+        -80
+      ],
+      "id": "4610014a-2435-42d7-9799-5f722538c21a",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fields = items[0].json;     \nconst weatherData = items[1].json;\nconst current = weatherData.current || {};\n\nconst city = fields.City || fields.city || \"Unknown City\";\nconst units = fields.units || \"metric\";\nconst tempUnit = units === \"imperial\" ? \"F\" : \"C\";\n\nlet temp = current.temp ?? null;\nlet feels = current.feels_like ?? null;\n\nif (units === \"metric\" && temp > 150) {\n    temp = temp - 273.15;\n    feels = feels - 273.15;\n}\n\nconst humidity = current.humidity ?? 0;\nconst windSpeedRaw = current.wind_speed ?? 0;\n\nlet windSpeed;\nlet windUnit;\nif (units === \"metric\") {\n    windSpeed = windSpeedRaw * 3.6;\n    windUnit = \"km/h\";\n} else {\n    windSpeed = windSpeedRaw;\n    windUnit = \"mph\";\n}\nconst condition = current.weather?.[0]?.description || \"Unknown\";\nconst conditionMain = current.weather?.[0]?.main || \"Unknown\";\n\nlet alertType = \"none\";\nconst lc = condition.toLowerCase();\n\nif (/rain|snow|drizzle|storm|thunder/.test(lc)) {\n    alertType = \"precipitation\";\n}\n\nelse if ((units === \"metric\" && temp > 32) || \n         (units === \"imperial\" && temp > 90)) {\n    alertType = \"heat\";\n}\n\nelse if ((units === \"metric\" && temp < 0) || \n         (units === \"imperial\" && temp < 32)) {\n    alertType = \"frost\";\n}\n\nconst alertMessage = {\n    none: \"No major weather alerts today.\",\n    precipitation: \"Rain or snow expected today.\",\n    heat: \"Heat alert today – stay hydrated.\",\n    frost: \"Frost alert – temperatures below freezing.\"\n}[alertType];\n\nconst summary = `\nDaily Weather - ${city}\n----------------------------------\nTemperature: ${temp.toFixed(1)}°${tempUnit}\nFeels Like: ${feels.toFixed(1)}°${tempUnit}\nHumidity: ${humidity}%\nWind: ${windSpeed.toFixed(1)} ${windUnit}\nCondition: ${conditionMain}\nDescription: ${condition}\nAlert: ${alertMessage}\n`.trim();\n\nreturn [\n  {\n    json: {\n      run_at: new Date().toISOString(),\n      city,\n      temperature: temp,\n      feels_like: feels,\n      temperature_unit: tempUnit,\n      condition,\n      humidity,\n      wind_speed: windSpeed,\n      alert_type: alertType,\n      summary,\n      raw_response: weatherData,\n      recipientEmail: fields.recipientEmail\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        -192
+      ],
+      "id": "c2914589-abdb-4a22-91ac-37823d758861",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        496,
+        -176
+      ],
+      "id": "d73d73e5-e9de-41d0-ae1c-f28b619c8499",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "tableId": "weather_logs",
+        "dataToSend": "autoMapInputData",
+        "inputsToIgnore": "feels_like, summary, recipientEmail"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        864,
+        -128
+      ],
+      "id": "23c1cc50-65f5-42eb-9ac1-6ab8ae22976f",
+      "name": "Create a row"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{$json.recipientEmail}}",
+        "subject": "=Weather Update for {{$json.city}} - {{ $now.format(\"MM/dd/yyyy\") }}",
+        "emailType": "text",
+        "message": "={{ $json.summary }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        864,
+        -272
+      ],
+      "id": "231588a0-9840-4c27-8616-477c86d6bc05",
+      "name": "Send a message",
+      "webhookId": "83f6e120-aff3-493e-b2c9-e328df283b52"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        []
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fe68e62f-0c4d-48ce-838e-eaede0720fa6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8d814c92ae8882b8544fb38a4988fd23dccb5ada4570453d97858822b598f5d3"
+  },
+  "id": "18KZP5F4ubEI5Qcu",
+  "tags": []
+}
