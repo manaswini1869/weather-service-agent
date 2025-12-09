@@ -74,6 +74,8 @@ The workflow sends the user a daily weather report via Gmail.
 2. Follow the Google OAuth login process.
 3. In the workflow, Gmail node should be configured with Credentials. Edit the Gmail node `Credential to Connect with` and select the newly created credential.
 
+You can visit [Google: OAuth2 single service](https://docs.n8n.io/integrations/builtin/credentials/google/oauth-single-service/?_gl=1*1jsrqgv*_gcl_au*NzMwOTY1NjE5LjE3NjUxMzc4NTA.*_ga*NTI3MTE3MjgwLjE3NjUxMzc4NTE.*_ga_0SC4FF2FH9*czE3NjUyMzc4ODYkbzckZzEkdDE3NjUyNDA3MDgkajYwJGwwJGgw) to know more about integration.
+
 ## Import and Run Workflow
 
 ### Import
